@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from ..models import User
+from ..models.user import User
 
 SECRET_KEY = "ThisIsTheSecretKeyOfFastAPIApplicationWithSQLAlchemyAndPydantic"
 ALGORITHM = "HS256"
@@ -30,7 +30,7 @@ def create_access_token(data: dict):
 def create_user(db: Session, user: User):
     existing_user = get_user_by_email(db, user.email)
     if existing_user:
-        raise ValueError("Email already registered")
+        raise ValueError("Email Already Registered")
 
     hashed_password = get_password_hash(user.password)
     db_user = User(email=user.email, password=hashed_password, nickname=user.nickname)
