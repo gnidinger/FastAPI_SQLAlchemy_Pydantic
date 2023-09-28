@@ -11,7 +11,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base: DeclarativeMeta = declarative_base()
 
 
-@contextmanager
 def get_db():
     db = SessionLocal()
     try:

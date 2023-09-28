@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from ..models.user import User
+from models.user import User
 
 SECRET_KEY = "ThisIsTheSecretKeyOfFastAPIApplicationWithSQLAlchemyAndPydantic"
 ALGORITHM = "HS256"
@@ -27,6 +27,10 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 
+def get_user_by_email(db: Session, email: str):
+    return db.query(User).filter(User.email == email).first()
+
+
 def create_user(db: Session, user: User):
     existing_user = get_user_by_email(db, user.email)
     if existing_user:
@@ -41,14 +45,10 @@ def create_user(db: Session, user: User):
     return db_user
 
 
-def get_user_by_email(db: Session, email: str):
-    return db.query(User).filter(User.email == email).first()
-
-
 def authenticate_user(db: Session, email: str, password: str):
     user = get_user_by_email(db, email)
     if not user:
-        return False
+        raise ValueError("Invalid Credentials")
     if not verify_password(password, user.password):
-        return False
+        raise ValueError("Invalid Credentials")
     return user

@@ -33,3 +33,8 @@ class UserLogin(BaseModel):
         if not re.match(r"[^@]+@[^@]+\.[^@]+", value):
             raise ValueError("Invalid Email Format")
         return value
+
+
+class UserResponse(BaseModel):
+    email: str
+    nickname: str
