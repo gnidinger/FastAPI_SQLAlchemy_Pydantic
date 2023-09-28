@@ -17,6 +17,11 @@ class FeedCreate(BaseModel):
     content: str
 
 
+class FeedUpdate(BaseModel):
+    title: str
+    content: str
+
+
 class FeedInDB(FeedCreate):
     pass
 
@@ -24,3 +29,4 @@ class FeedInDB(FeedCreate):
 class FeedResponse(FeedCreate):
     id: int
     author_email: str
+    author_nickname: str
