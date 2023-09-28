@@ -10,7 +10,7 @@ def create_feed(db: Session, feed: FeedCreate, author_email: str):
 
     db_feed = Feed(**feed_dict)
 
-    author = db.query(User).filter(User.email == author_email).first()  # 예시 코드
+    author = db.query(User).filter(User.email == author_email).first()
     author_nickname = author.nickname
 
     db_feed.author_nickname = author_nickname
@@ -44,3 +44,16 @@ def update_feed(db: Session, feed_id: int, feed_update: FeedUpdate, email: str):
 
 def get_feeds(db: Session):
     return db.query(Feed).all()
+
+
+def delete_feed(db: Session, feed_id: int, email: str):
+    db_feed = db.query(Feed).filter(Feed.id == feed_id).first()
+
+    if db_feed is None:
+        raise HTTPException(status_code=404, detail="Feed Not Found")
+
+    if db_feed.author_email != email:
+        raise HTTPException(status_code=403, detail="Permission Denied")
+
+    db.delete(db_feed)
+    db.commit()

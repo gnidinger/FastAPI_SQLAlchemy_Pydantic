@@ -46,3 +46,15 @@ def update(
 @router.get("/list", response_model=List[FeedResponse])
 def list_feeds(db: Session = Depends(get_db)):
     return feed_service.get_feeds(db)
+
+
+@router.delete("/delete/{feed_id}", response_model=None)
+def delete(
+    feed_id: int,
+    db: Session = Depends(get_db),
+    email: str = Depends(auth_service.get_current_user_authorization),
+):
+    if email is None:
+        raise HTTPException(status_code=401, detail="Not Authorized")
+
+    feed_service.delete_feed(db, feed_id, email)
