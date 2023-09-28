@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import join
 from models.feed import Feed, FeedCreate, FeedUpdate
 from models.user import User
 
@@ -42,8 +43,44 @@ def update_feed(db: Session, feed_id: int, feed_update: FeedUpdate, email: str):
     return db_feed
 
 
+def get_feed_by_id(db: Session, feed_id: int):
+    feed_data = (
+        db.query(Feed, User.nickname)
+        .join(User, User.email == Feed.author_email)
+        .filter(Feed.id == feed_id)
+        .first()
+    )
+
+    if feed_data is None:
+        raise HTTPException(status_code=404, detail="Feed not found")
+
+    feed, nickname = feed_data
+    feed_response = {
+        "id": feed.id,
+        "title": feed.title,
+        "content": feed.content,
+        "author_email": feed.author_email,
+        "author_nickname": nickname,  # 닉네임 추가
+    }
+
+    return feed_response
+
+
 def get_feeds(db: Session):
-    return db.query(Feed).all()
+    feeds = db.query(Feed, User.nickname).join(User, User.email == Feed.author_email).all()
+    feed_responses = []
+
+    for feed, nickname in feeds:
+        feed_dict = {
+            "id": feed.id,
+            "title": feed.title,
+            "content": feed.content,
+            "author_email": feed.author_email,
+            "author_nickname": nickname,
+        }
+        feed_responses.append(feed_dict)
+
+    return feed_responses
 
 
 def delete_feed(db: Session, feed_id: int, email: str):

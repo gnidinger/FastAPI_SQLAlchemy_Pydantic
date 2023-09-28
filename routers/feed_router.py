@@ -30,6 +30,16 @@ def create(
     }
 
 
+@router.get("/read/{feed_id}", response_model=FeedResponse)
+def read_feed(feed_id: int, db: Session = Depends(get_db)):
+    return feed_service.get_feed_by_id(db, feed_id)
+
+
+@router.get("/list", response_model=List[FeedResponse])
+def list_feeds(db: Session = Depends(get_db)):
+    return feed_service.get_feeds(db)
+
+
 @router.patch("/update/{feed_id}", response_model=FeedResponse)
 def update(
     feed_id: int,
@@ -41,11 +51,6 @@ def update(
         raise HTTPException(status_code=401, detail="Not authorized")
 
     return feed_service.update_feed(db, feed_id, feed, email)
-
-
-@router.get("/list", response_model=List[FeedResponse])
-def list_feeds(db: Session = Depends(get_db)):
-    return feed_service.get_feeds(db)
 
 
 @router.delete("/delete/{feed_id}", response_model=None)
