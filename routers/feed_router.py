@@ -17,17 +17,7 @@ def create(
     if email is None:
         raise HTTPException(status_code=401, detail="Not authorized")
 
-    feed_dict = feed.model_dump()
-    feed_dict["author_email"] = email
-    db_feed = feed_service.create_feed(db, FeedCreate(**feed_dict), email)
-
-    return {
-        "id": db_feed.id,
-        "title": db_feed.title,
-        "content": db_feed.content,
-        "author_email": db_feed.author_email,
-        "author_nickname": db_feed.author_nickname,
-    }
+    return feed_service.create_feed(db, feed, email)
 
 
 @router.get("/read/{feed_id}", response_model=FeedResponse)

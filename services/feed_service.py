@@ -9,16 +9,24 @@ def create_feed(db: Session, feed: FeedCreate, author_email: str):
     feed_dict = feed.model_dump()
     feed_dict["author_email"] = author_email
 
-    db_feed = Feed(**feed_dict)
-
     author = db.query(User).filter(User.email == author_email).first()
+    if author is None:
+        raise HTTPException(status_code=404, detail="Author Not Found")
+
     author_nickname = author.nickname
 
-    db_feed.author_nickname = author_nickname
+    db_feed = Feed(**feed_dict)
     db.add(db_feed)
     db.commit()
     db.refresh(db_feed)
-    return db_feed
+
+    return {
+        "id": db_feed.id,
+        "title": db_feed.title,
+        "content": db_feed.content,
+        "author_email": db_feed.author_email,
+        "author_nickname": author_nickname,
+    }
 
 
 def update_feed(db: Session, feed_id: int, feed_update: FeedUpdate, email: str):
