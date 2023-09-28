@@ -2,9 +2,9 @@ from sqlalchemy.orm import Session
 from models.feed import Feed, FeedCreate
 
 
-def create_feed(db: Session, feed: FeedCreate):  # FeedCreate 사용
+def create_feed(db: Session, feed: FeedCreate):
     feed_data = feed.dict()
-    db_feed = Feed(**feed_data, author_email=feed_data.get("email"))
+    db_feed = Feed(**feed_data)
     db.add(db_feed)
     db.commit()
     db.refresh(db_feed)

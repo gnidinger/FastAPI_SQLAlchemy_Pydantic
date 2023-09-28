@@ -15,7 +15,7 @@ class Feed(Base):
 class FeedCreate(BaseModel):
     title: str
     content: str
-    email: str
+    author_email: str
 
 
 class FeedInDB(FeedCreate):
