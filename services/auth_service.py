@@ -1,3 +1,4 @@
+from fastapi import Depends, HTTPException, Request
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
@@ -52,3 +53,19 @@ def authenticate_user(db: Session, email: str, password: str):
     if not verify_password(password, user.password):
         raise ValueError("Invalid Credentials")
     return user
+
+
+def get_current_user_authorization(request: Request):
+    authorization = request.headers.get("Authorization")
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Not Authenticated")
+
+    token = authorization.replace("Bearer ", "")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid Token")
+        return email
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail="Invalid Token")
