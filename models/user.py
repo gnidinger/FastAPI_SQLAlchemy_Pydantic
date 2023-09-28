@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String
+from sqlalchemy.orm import relationship
 from config.db import Base
 from pydantic import BaseModel, validator
 import re
@@ -7,9 +8,11 @@ import re
 class User(Base):
     __tablename__ = "users"
 
-    email = Column(String, primary_key=True, index=True)
+    email = Column(String, primary_key=True, unique=True, index=True)
     password = Column(String())
     nickname = Column(String())
+
+    feeds = relationship("Feed", back_populates="author")
 
 
 class UserCreate(BaseModel):

@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Integer, ForeignKey
+from sqlalchemy.orm import relationship
 from config.db import Base
 from pydantic import BaseModel
 
@@ -10,6 +11,8 @@ class Feed(Base):
     title = Column(String, index=True)
     content = Column(String)
     author_email = Column(String, ForeignKey("users.email"))
+
+    author = relationship("User", back_populates="feeds")
 
 
 class FeedCreate(BaseModel):
