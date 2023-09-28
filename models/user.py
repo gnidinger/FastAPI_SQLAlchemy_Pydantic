@@ -1,9 +1,7 @@
 from sqlalchemy import Column, String
-from sqlalchemy.ext.declarative import declarative_base
+from config.db import Base
 from pydantic import BaseModel, validator
 import re
-
-Base = declarative_base()
 
 
 class User(Base):
