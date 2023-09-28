@@ -48,7 +48,13 @@ def update_feed(db: Session, feed_id: int, feed_update: FeedUpdate, email: str):
     db.commit()
     db.refresh(db_feed)
 
-    return db_feed
+    return {
+        "id": db_feed.id,
+        "title": db_feed.title,
+        "content": db_feed.content,
+        "author_email": db_feed.author_email,
+        "author_nickname": author_nickname,
+    }
 
 
 def get_feed_by_id(db: Session, feed_id: int):
