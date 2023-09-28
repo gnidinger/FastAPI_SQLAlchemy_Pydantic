@@ -29,8 +29,13 @@ def update_feed(db: Session, feed_id: int, feed_update: FeedUpdate, email: str):
     if db_feed.author_email != email:
         raise HTTPException(status_code=403, detail="Permission Denied")
 
+    author = db.query(User).filter(User.email == email).first()
+    author_nickname = author.nickname
+
     db_feed.title = feed_update.title
     db_feed.content = feed_update.content
+    db_feed.author_nickname = author_nickname
+
     db.commit()
     db.refresh(db_feed)
 
