@@ -4,7 +4,7 @@ from sqlalchemy import join
 from models.feed import Feed, FeedCreate, FeedUpdate
 from models.user import User
 from config import settings
-from typing import List
+from typing import List, Optional
 import uuid
 from config.s3_config import s3_client
 
@@ -77,7 +77,14 @@ def get_feeds(db: Session):
     return feed_responses
 
 
-def update_feed(db: Session, feed_id: int, feed_update: FeedUpdate, email: str):
+def update_feed(
+    db: Session,
+    feed_id: int,
+    feed_update: FeedUpdate,
+    email: str,
+    new_images: Optional[List[UploadFile]] = None,
+    target_image_urls: Optional[List[str]] = None,
+):
     db_feed = db.query(Feed).filter(Feed.id == feed_id).first()
 
     if db_feed is None:
@@ -93,6 +100,10 @@ def update_feed(db: Session, feed_id: int, feed_update: FeedUpdate, email: str):
     db_feed.content = feed_update.content
     db_feed.author_nickname = author_nickname
 
+    if new_images and target_image_urls:
+        updated_image_urls = update_image_from_s3(db, feed_id, new_images, target_image_urls)
+        db_feed.image_urls = updated_image_urls
+
     db.commit()
     db.refresh(db_feed)
 
@@ -102,6 +113,7 @@ def update_feed(db: Session, feed_id: int, feed_update: FeedUpdate, email: str):
         "content": db_feed.content,
         "author_email": db_feed.author_email,
         "author_nickname": author_nickname,
+        "image_urls": db_feed.image_urls,
     }
 
 
@@ -132,3 +144,42 @@ def upload_image_to_s3(images: List[UploadFile]):
         image_urls.append(image_url)
 
     return image_urls
+
+
+def delete_image_from_s3(image_url: str):
+    image_name = image_url.split("/")[-1]
+    s3_client.delete_object(Bucket=settings.S3_BUCKET, Key=image_name)
+
+
+def update_image_from_s3(
+    db: Session,
+    feed_id: int,
+    new_images: List[UploadFile],
+    target_image_urls: List[str],
+):
+    db_feed = db.query(Feed).filter(Feed.id == feed_id).first()
+
+    existing_image_urls = db_feed.image_urls
+    new_image_urls = upload_image_to_s3(new_images)
+
+    min_len = min(len(target_image_urls), len(new_image_urls))
+
+    for i in range(min_len):
+        index = existing_image_urls.index(target_image_urls[i])
+        existing_image_urls[index] = new_image_urls[i]
+        delete_image_from_s3(target_image_urls[i])
+
+    if len(new_image_urls) > min_len:
+        additional_images = new_image_urls[min_len:]
+        existing_image_urls.extend(additional_images)
+
+    if len(target_image_urls) > min_len:
+        for url in target_image_urls[min_len:]:
+            existing_image_urls.remove(url)
+            delete_image_from_s3(url)
+
+    db_feed.image_urls = existing_image_urls
+    db.commit()
+    db.refresh(db_feed)
+
+    return existing_image_urls

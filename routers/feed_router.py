@@ -39,14 +39,21 @@ def list_feeds(db: Session = Depends(get_db)):
 @router.patch("/update/{feed_id}", response_model=FeedResponse)
 def update(
     feed_id: int,
-    feed: FeedUpdate,
+    title: str = Form(...),
+    content: str = Form(...),
+    new_images: List[UploadFile] = Form(..., alias="new_images[]"),
+    target_image_urls: List[str] = Form(..., alias="target_image_urls[]"),
     db: Session = Depends(get_db),
     email: str = Depends(auth_service.get_current_user_authorization),
 ):
     if email is None:
         raise HTTPException(status_code=401, detail="Not authorized")
 
-    return feed_service.update_feed(db, feed_id, feed, email)
+    feed_update = FeedUpdate(title=title, content=content)
+
+    return feed_service.update_feed(
+        db, feed_id, feed_update, email, new_images=new_images, target_image_urls=target_image_urls
+    )
 
 
 @router.delete("/delete/{feed_id}", response_model=None)
