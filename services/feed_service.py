@@ -1,8 +1,12 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from sqlalchemy import join
 from models.feed import Feed, FeedCreate, FeedUpdate
 from models.user import User
+from config import settings
+from typing import List
+import uuid
+from config.s3_config import s3_client
 
 
 def create_feed(db: Session, feed: FeedCreate, author_email: str):
@@ -107,3 +111,19 @@ def delete_feed(db: Session, feed_id: int, email: str):
 
     db.delete(db_feed)
     db.commit()
+
+
+def upload_image_to_s3(images: List[UploadFile]):
+    image_urls = []
+    for image in images:
+        image_filename = f"{uuid.uuid4()}.png"
+        s3_client.upload_fileobj(
+            image.file,
+            settings.S3_BUCKET,
+            image_filename,
+            ExtraArgs={"ACL": "public-read", "ContentType": image.content_type},
+        )
+        image_url = f"https://{settings.S3_BUCKET}.s3.ap-northeast-2.amazonaws.com{image_filename}"
+        image_urls.append(image_url)
+
+    return image_urls
