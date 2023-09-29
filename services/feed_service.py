@@ -29,6 +29,45 @@ def create_feed(db: Session, feed: FeedCreate, author_email: str):
     }
 
 
+def get_feed_by_id(db: Session, feed_id: int):
+    feed_data = (
+        db.query(Feed, User.nickname)
+        .join(User, User.email == Feed.author_email)
+        .filter(Feed.id == feed_id)
+        .first()
+    )
+
+    if feed_data is None:
+        raise HTTPException(status_code=404, detail="Feed not found")
+
+    feed, nickname = feed_data
+
+    return {
+        "id": feed.id,
+        "title": feed.title,
+        "content": feed.content,
+        "author_email": feed.author_email,
+        "author_nickname": nickname,
+    }
+
+
+def get_feeds(db: Session):
+    feeds = db.query(Feed, User.nickname).join(User, User.email == Feed.author_email).all()
+    feed_responses = []
+
+    for feed, nickname in feeds:
+        feed_dict = {
+            "id": feed.id,
+            "title": feed.title,
+            "content": feed.content,
+            "author_email": feed.author_email,
+            "author_nickname": nickname,
+        }
+        feed_responses.append(feed_dict)
+
+    return feed_responses
+
+
 def update_feed(db: Session, feed_id: int, feed_update: FeedUpdate, email: str):
     db_feed = db.query(Feed).filter(Feed.id == feed_id).first()
 
@@ -55,46 +94,6 @@ def update_feed(db: Session, feed_id: int, feed_update: FeedUpdate, email: str):
         "author_email": db_feed.author_email,
         "author_nickname": author_nickname,
     }
-
-
-def get_feed_by_id(db: Session, feed_id: int):
-    feed_data = (
-        db.query(Feed, User.nickname)
-        .join(User, User.email == Feed.author_email)
-        .filter(Feed.id == feed_id)
-        .first()
-    )
-
-    if feed_data is None:
-        raise HTTPException(status_code=404, detail="Feed not found")
-
-    feed, nickname = feed_data
-    feed_response = {
-        "id": feed.id,
-        "title": feed.title,
-        "content": feed.content,
-        "author_email": feed.author_email,
-        "author_nickname": nickname,  # 닉네임 추가
-    }
-
-    return feed_response
-
-
-def get_feeds(db: Session):
-    feeds = db.query(Feed, User.nickname).join(User, User.email == Feed.author_email).all()
-    feed_responses = []
-
-    for feed, nickname in feeds:
-        feed_dict = {
-            "id": feed.id,
-            "title": feed.title,
-            "content": feed.content,
-            "author_email": feed.author_email,
-            "author_nickname": nickname,
-        }
-        feed_responses.append(feed_dict)
-
-    return feed_responses
 
 
 def delete_feed(db: Session, feed_id: int, email: str):
