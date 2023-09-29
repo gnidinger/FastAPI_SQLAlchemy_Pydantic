@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from models.feed import FeedCreate, FeedResponse, FeedUpdate
 from services import feed_service, auth_service
@@ -10,12 +10,18 @@ router = APIRouter()
 
 @router.post("/create", response_model=FeedResponse)
 def create(
-    feed: FeedCreate,
+    title: str = Form(...),
+    content: str = Form(...),
+    images: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
     email: str = Depends(auth_service.get_current_user_authorization),
 ):
     if email is None:
         raise HTTPException(status_code=401, detail="Not authorized")
+
+    image_urls = feed_service.upload_image_to_s3(images)
+
+    feed = FeedCreate(title=title, content=content, image_urls=image_urls)
 
     return feed_service.create_feed(db, feed, email)
 

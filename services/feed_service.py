@@ -9,9 +9,13 @@ import uuid
 from config.s3_config import s3_client
 
 
-def create_feed(db: Session, feed: FeedCreate, author_email: str):
+def create_feed(db: Session, feed: FeedCreate, author_email: str, images: List[UploadFile] = None):
     feed_dict = feed.model_dump()
     feed_dict["author_email"] = author_email
+
+    if images:
+        image_urls = upload_image_to_s3(images)
+        feed_dict["image_urls"] = image_urls
 
     author = db.query(User).filter(User.email == author_email).first()
     if author is None:
@@ -30,6 +34,7 @@ def create_feed(db: Session, feed: FeedCreate, author_email: str):
         "content": db_feed.content,
         "author_email": db_feed.author_email,
         "author_nickname": author_nickname,
+        "image_urls": db_feed.image_urls,
     }
 
 
@@ -116,14 +121,14 @@ def delete_feed(db: Session, feed_id: int, email: str):
 def upload_image_to_s3(images: List[UploadFile]):
     image_urls = []
     for image in images:
-        image_filename = f"{uuid.uuid4()}.png"
+        image_name = f"{uuid.uuid4()}.png"
         s3_client.upload_fileobj(
             image.file,
             settings.S3_BUCKET,
-            image_filename,
-            ExtraArgs={"ACL": "public-read", "ContentType": image.content_type},
+            image_name,
+            # ExtraArgs={"ACL": "public-read", "ContentType": image.content_type},
         )
-        image_url = f"https://{settings.S3_BUCKET}.s3.ap-northeast-2.amazonaws.com{image_filename}"
+        image_url = f"https://{settings.S3_BUCKET}.s3.ap-northeast-2.amazonaws.com/{image_name}"
         image_urls.append(image_url)
 
     return image_urls

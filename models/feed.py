@@ -20,13 +20,13 @@ class Feed(Base):
 class FeedCreate(BaseModel):
     title: str
     content: str
-    image_urls = Optional[List[str]] = []
+    image_urls: Optional[List[str]] = []
 
 
 class FeedUpdate(BaseModel):
     title: str
     content: str
-    image_urls = Optional[List[str]]
+    image_urls: Optional[List[str]]
 
 
 class FeedInDB(FeedCreate):
