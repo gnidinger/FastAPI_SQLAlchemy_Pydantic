@@ -4,6 +4,15 @@ from models.user import Base as UserBase  # User의 Base 클래스
 from models.feed import Base as FeedBase  # Feed의 Base 클래스
 from routers import auth_router
 from routers import feed_router
+import boto3
+from config import settings
+
+s3_client = boto3.client(
+    "s3",
+    aws_access_key_id=settings.S3_ACCESS_KEY,
+    aws_secret_access_key=settings.S3_SECRET_KEY,
+    region_name="ap-northeast-2",
+)
 
 DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(DATABASE_URL)
