@@ -41,8 +41,8 @@ def update(
     feed_id: int,
     title: str = Form(...),
     content: str = Form(...),
-    new_images: List[UploadFile] = Form(..., alias="new_images[]"),
-    target_image_urls: List[str] = Form(..., alias="target_image_urls[]"),
+    new_images: List[UploadFile] = Form(None, alias="new_images[]"),
+    target_image_urls: List[str] = Form(None, alias="target_image_urls[]"),
     db: Session = Depends(get_db),
     email: str = Depends(auth_service.get_current_user_authorization),
 ):
