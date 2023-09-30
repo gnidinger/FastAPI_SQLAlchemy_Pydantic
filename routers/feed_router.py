@@ -41,7 +41,7 @@ def update(
     feed_id: int,
     title: str = Form(...),
     content: str = Form(...),
-    new_images: List[UploadFile] = Form(None, alias="new_images[]"),
+    new_images: List[UploadFile] = File(None, alias="new_images[]"),
     target_image_urls: List[str] = Form(None, alias="target_image_urls[]"),
     db: Session = Depends(get_db),
     email: str = Depends(auth_service.get_current_user_authorization),
@@ -49,7 +49,13 @@ def update(
     if email is None:
         raise HTTPException(status_code=401, detail="Not authorized")
 
-    feed_update = FeedUpdate(title=title, content=content)
+    if new_images and target_image_urls:
+        updated_image_urls = feed_service.update_image_from_s3(
+            db, feed_id, new_images, target_image_urls
+        )
+        feed_update = FeedUpdate(title=title, content=content, image_urls=updated_image_urls)
+    else:
+        feed_update = FeedUpdate(title=title, content=content)
 
     return feed_service.update_feed(
         db, feed_id, feed_update, email, new_images=new_images, target_image_urls=target_image_urls

@@ -26,7 +26,7 @@ class FeedCreate(BaseModel):
 class FeedUpdate(BaseModel):
     title: str
     content: str
-    image_urls: Optional[List[str]]
+    image_urls: Optional[List[str]] = []
 
 
 class FeedInDB(FeedCreate):
