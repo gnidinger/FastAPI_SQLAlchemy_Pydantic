@@ -7,6 +7,9 @@ from config import settings
 from typing import List, Optional
 import uuid
 from config.s3_config import s3_client
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 def create_feed(db: Session, feed: FeedCreate, author_email: str, images: List[UploadFile] = None):
@@ -57,6 +60,7 @@ def get_feed_by_id(db: Session, feed_id: int):
         "content": feed.content,
         "author_email": feed.author_email,
         "author_nickname": nickname,
+        "image_urls": feed.image_urls,
     }
 
 
@@ -71,6 +75,7 @@ def get_feeds(db: Session):
             "content": feed.content,
             "author_email": feed.author_email,
             "author_nickname": nickname,
+            "image_urls": feed.image_urls,
         }
         feed_responses.append(feed_dict)
 
@@ -98,16 +103,36 @@ def update_feed(
 
     db_feed.title = feed_update.title
     db_feed.content = feed_update.content
-    db_feed.author_nickname = author_nickname
 
+    existing_image_urls = db_feed.image_urls or []
+
+    # Case 1: Both new_images and target_image_urls exist
     if new_images and target_image_urls:
-        updated_image_urls = update_image_from_s3(db, feed_id, new_images, target_image_urls)
-        db_feed.image_urls = updated_image_urls
+        for url in target_image_urls:
+            print(url)
+            delete_image_from_s3(url)
+        new_image_urls = upload_image_to_s3(new_images)
+        existing_image_urls = [url for url in existing_image_urls if url not in target_image_urls]
+        existing_image_urls = existing_image_urls + new_image_urls
+
+    # Case 2: Only new_images exist
+    elif new_images:
+        new_image_urls = upload_image_to_s3(new_images)
+        existing_image_urls = existing_image_urls + new_image_urls
+
+    # Case 3: Only target_image_urls exist
+    elif target_image_urls:
+        for url in target_image_urls:
+            delete_image_from_s3(url)
+        existing_image_urls = [url for url in existing_image_urls if url not in target_image_urls]
+
+    db_feed.image_urls = existing_image_urls
+    print(db_feed.image_urls)
 
     db.commit()
     db.refresh(db_feed)
 
-    return {
+    result = {
         "id": db_feed.id,
         "title": db_feed.title,
         "content": db_feed.content,
@@ -115,6 +140,10 @@ def update_feed(
         "author_nickname": author_nickname,
         "image_urls": db_feed.image_urls,
     }
+
+    logging.debug(f"Updated feed: {result}")
+
+    return result
 
 
 def delete_feed(db: Session, feed_id: int, email: str):
@@ -133,6 +162,7 @@ def delete_feed(db: Session, feed_id: int, email: str):
 def upload_image_to_s3(images: List[UploadFile]):
     image_urls = []
     for image in images:
+        logging.debug(f"Uploading {image.filename}")
         image_name = f"{uuid.uuid4()}.png"
         s3_client.upload_fileobj(
             image.file,
@@ -148,38 +178,66 @@ def upload_image_to_s3(images: List[UploadFile]):
 
 def delete_image_from_s3(image_url: str):
     image_name = image_url.split("/")[-1]
+    bucket_name = settings.S3_BUCKET
+
+    print(f"Deleting from Bucket: {bucket_name}, Key: {image_name}")
+
     s3_client.delete_object(Bucket=settings.S3_BUCKET, Key=image_name)
 
 
 def update_image_from_s3(
     db: Session,
     feed_id: int,
-    new_images: List[UploadFile],
-    target_image_urls: List[str],
+    new_images: Optional[List[UploadFile]],
+    target_image_urls: Optional[List[str]],
 ):
     db_feed = db.query(Feed).filter(Feed.id == feed_id).first()
+    existing_image_urls = db_feed.image_urls or []
 
-    existing_image_urls = db_feed.image_urls
-    new_image_urls = upload_image_to_s3(new_images)
+    if new_images and target_image_urls:
+        existing_image_urls = [url for url in existing_image_urls if url not in target_image_urls]
+        new_uploaded_urls = upload_new_images(new_images)
+        existing_image_urls += new_uploaded_urls
 
-    min_len = min(len(target_image_urls), len(new_image_urls))
+    elif new_images:
+        new_uploaded_urls = upload_new_images(new_images)
+        existing_image_urls += new_uploaded_urls
 
-    for i in range(min_len):
-        index = existing_image_urls.index(target_image_urls[i])
-        existing_image_urls[index] = new_image_urls[i]
-        delete_image_from_s3(target_image_urls[i])
-
-    if len(new_image_urls) > min_len:
-        additional_images = new_image_urls[min_len:]
-        existing_image_urls.extend(additional_images)
-
-    if len(target_image_urls) > min_len:
-        for url in target_image_urls[min_len:]:
-            existing_image_urls.remove(url)
-            delete_image_from_s3(url)
-
-    db_feed.image_urls = existing_image_urls
-    db.commit()
-    db.refresh(db_feed)
+    elif target_image_urls:
+        existing_image_urls = [url for url in existing_image_urls if url not in target_image_urls]
 
     return existing_image_urls
+
+
+# def update_image_from_s3(
+#     db: Session,
+#     feed_id: int,
+#     new_images: List[UploadFile],
+#     target_image_urls: List[str],
+# ):
+#     db_feed = db.query(Feed).filter(Feed.id == feed_id).first()
+
+#     existing_image_urls = db_feed.image_urls
+#     new_image_urls = upload_image_to_s3(new_images)
+
+#     min_len = min(len(target_image_urls), len(new_image_urls))
+
+#     for i in range(min_len):
+#         index = existing_image_urls.index(target_image_urls[i])
+#         existing_image_urls[index] = new_image_urls[i]
+#         delete_image_from_s3(target_image_urls[i])
+
+#     if len(new_image_urls) > min_len:
+#         additional_images = new_image_urls[min_len:]
+#         existing_image_urls.extend(additional_images)
+
+#     if len(target_image_urls) > min_len:
+#         for url in target_image_urls[min_len:]:
+#             existing_image_urls.remove(url)
+#             delete_image_from_s3(url)
+
+#     db_feed.image_urls = existing_image_urls
+#     db.commit()
+#     db.refresh(db_feed)
+
+#     return existing_image_urls
