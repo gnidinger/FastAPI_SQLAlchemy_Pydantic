@@ -9,7 +9,7 @@ import uuid
 from config.s3_config import s3_client
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.NOTSET)
 
 
 def create_feed(db: Session, feed: FeedCreate, author_email: str, images: List[UploadFile] = None):
@@ -155,6 +155,11 @@ def delete_feed(db: Session, feed_id: int, email: str):
     if db_feed.author_email != email:
         raise HTTPException(status_code=403, detail="Permission Denied")
 
+    image_urls = db_feed.image_urls
+
+    for image_url in image_urls:
+        delete_image_from_s3(image_url)
+
     db.delete(db_feed)
     db.commit()
 
@@ -168,7 +173,7 @@ def upload_image_to_s3(images: List[UploadFile]):
             image.file,
             settings.S3_BUCKET,
             image_name,
-            # ExtraArgs={"ACL": "public-read", "ContentType": image.content_type},
+            ExtraArgs={"ContentType": image.content_type},
         )
         image_url = f"https://{settings.S3_BUCKET}.s3.ap-northeast-2.amazonaws.com/{image_name}"
         image_urls.append(image_url)
@@ -180,6 +185,6 @@ def delete_image_from_s3(image_url: str):
     image_name = image_url.split("/")[-1]
     bucket_name = settings.S3_BUCKET
 
-    print(f"Deleting from Bucket: {bucket_name}, Key: {image_name}")
+    logging.debug(f"Deleting from Bucket: {bucket_name}, Key: {image_name}")
 
     s3_client.delete_object(Bucket=settings.S3_BUCKET, Key=image_name)

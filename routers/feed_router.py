@@ -22,14 +22,9 @@ def create(
     if email is None:
         raise HTTPException(status_code=401, detail="Not authorized")
 
-    if images:
-        image_urls = feed_service.upload_image_to_s3(images)
-    else:
-        image_urls = []
+    feed = FeedCreate(title=title, content=content)
 
-    feed = FeedCreate(title=title, content=content, image_urls=image_urls)
-
-    return feed_service.create_feed(db, feed, email)
+    return feed_service.create_feed(db, feed, email, images)
 
 
 @router.get("/read/{feed_id}", response_model=FeedResponse)
