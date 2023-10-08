@@ -38,7 +38,26 @@ def create_comment(db: Session, comment: CommentCreate, author_email: str):
 
 def get_comment_by_feed_id(db: Session, feed_id: int):
     comments = db.query(Comment).filter(Comment.feed_id == feed_id).all()
-    return comments
+    comment_responses = []
+
+    for comment in comments:
+        author = db.query(User).filter(User.email == comment.author_email).first()
+        if author is None:
+            continue  # 혹은 적절한 예외를 발생시키세요.
+
+        author_nickname = author.nickname
+
+        comment_responses.append(
+            {
+                "id": comment.id,
+                "content": comment.content,
+                "author_email": comment.author_email,
+                "author_nickname": author_nickname,
+                "feed_id": comment.feed_id,
+            }
+        )
+
+    return comment_responses
 
 
 def update_comment(db: Session, comment_id: int, comment_update: CommentUpdate, email: str):
