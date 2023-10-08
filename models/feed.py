@@ -15,6 +15,7 @@ class Feed(Base):
     image_urls = Column(JSON, nullable=True)
 
     author = relationship("User", back_populates="feeds")
+    comments = relationship("Comment", back_populates="feed")
 
 
 class FeedCreate(BaseModel):

@@ -13,6 +13,7 @@ class User(Base):
     nickname = Column(String())
 
     feeds = relationship("Feed", back_populates="author")
+    comments = relationship("Comment", back_populates="author")
 
 
 class UserCreate(BaseModel):
