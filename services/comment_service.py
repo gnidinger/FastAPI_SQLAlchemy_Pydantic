@@ -42,8 +42,6 @@ def get_comment_by_feed_id(db: Session, feed_id: int):
 
     for comment in comments:
         author = db.query(User).filter(User.email == comment.author_email).first()
-        if author is None:
-            continue  # 혹은 적절한 예외를 발생시키세요.
 
         author_nickname = author.nickname
 
@@ -74,7 +72,19 @@ def update_comment(db: Session, comment_id: int, comment_update: CommentUpdate, 
     db.commit()
     db.refresh(db_comment)
 
-    return db_comment
+    author = db.query(User).filter(User.email == email).first()
+    if author is None:
+        raise HTTPException(status_code=404, detail="Author Not Found")
+
+    author_nickname = author.nickname
+
+    return {
+        "id": db_comment.id,
+        "content": db_comment.content,
+        "author_email": db_comment.author_email,
+        "author_nickname": author_nickname,
+        "feed_id": db_comment.feed_id,
+    }
 
 
 def delete_comment(db: Session, comment_id: int, email: str):
