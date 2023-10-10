@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 from config.db import Base
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Optional
 
 
 class Comment(Base):
