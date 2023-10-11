@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from models.comment import CommentCreate, CommentUpdate, CommentResponse
 from services import comment_service, auth_service
