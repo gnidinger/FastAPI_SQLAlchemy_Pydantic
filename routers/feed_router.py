@@ -12,7 +12,7 @@ router = APIRouter()
 
 
 @router.post("/create", response_model=FeedResponse)
-async def create(
+def create(
     title: str = Form(...),
     content: str = Form(...),
     images: List[UploadFile] = File(None),
@@ -24,21 +24,21 @@ async def create(
 
     feed = FeedCreate(title=title, content=content)
 
-    return await feed_service.create_feed(db, feed, email, images)
+    return feed_service.create_feed(db, feed, email, images)
 
 
 @router.get("/read/{feed_id}", response_model=FeedResponse)
-async def read_feed(feed_id: int, db: Session = Depends(get_db)):
-    return await feed_service.get_feed_by_id(db, feed_id)
+def read_feed(feed_id: int, db: Session = Depends(get_db)):
+    return feed_service.get_feed_by_id(db, feed_id)
 
 
 @router.get("/list", response_model=List[FeedResponse])
-async def list_feeds(db: Session = Depends(get_db)):
-    return await feed_service.get_feeds(db)
+def list_feeds(db: Session = Depends(get_db)):
+    return feed_service.get_feeds(db)
 
 
 @router.patch("/update/{feed_id}", response_model=FeedResponse)
-async def update(
+def update(
     feed_id: int,
     title: str = Form(...),
     content: str = Form(...),
@@ -55,11 +55,11 @@ async def update(
         db, feed_id, feed_update, email, new_images=new_images, target_image_urls=target_image_urls
     )
 
-    return await updated_feed
+    return updated_feed
 
 
 @router.delete("/delete/{feed_id}", response_model=None)
-async def delete(
+def delete(
     feed_id: int,
     db: Session = Depends(get_db),
     email: str = Depends(auth_service.get_current_user_authorization),
@@ -67,5 +67,5 @@ async def delete(
     if email is None:
         raise HTTPException(status_code=401, detail="Not Authorized")
 
-    await feed_service.delete_feed(db, feed_id, email)
+    feed_service.delete_feed(db, feed_id, email)
     return {"message": "Feed Deleted"}

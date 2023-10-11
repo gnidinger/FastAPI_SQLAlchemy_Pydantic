@@ -12,9 +12,7 @@ import logging
 logging.basicConfig(level=logging.NOTSET)
 
 
-async def create_feed(
-    db: Session, feed: FeedCreate, author_email: str, images: List[UploadFile] = None
-):
+def create_feed(db: Session, feed: FeedCreate, author_email: str, images: List[UploadFile] = None):
     feed_dict = feed.model_dump()
     feed_dict["author_email"] = author_email
 
@@ -43,7 +41,7 @@ async def create_feed(
     }
 
 
-async def get_feed_by_id(db: Session, feed_id: int):
+def get_feed_by_id(db: Session, feed_id: int):
     feed_data = (
         db.query(Feed, User.nickname)
         .join(User, User.email == Feed.author_email)
@@ -66,7 +64,7 @@ async def get_feed_by_id(db: Session, feed_id: int):
     }
 
 
-async def get_feeds(db: Session):
+def get_feeds(db: Session):
     feeds = db.query(Feed, User.nickname).join(User, User.email == Feed.author_email).all()
     feed_responses = []
 
@@ -84,7 +82,7 @@ async def get_feeds(db: Session):
     return feed_responses
 
 
-async def update_feed(
+def update_feed(
     db: Session,
     feed_id: int,
     feed_update: FeedUpdate,
@@ -148,7 +146,7 @@ async def update_feed(
     return result
 
 
-async def delete_feed(db: Session, feed_id: int, email: str):
+def delete_feed(db: Session, feed_id: int, email: str):
     db_feed = db.query(Feed).filter(Feed.id == feed_id).first()
 
     if db_feed is None:

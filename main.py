@@ -5,7 +5,7 @@ from models.feed import Base as FeedBase  # Feed의 Base 클래스
 from models.comment import Base as CommentBase  # Comment의 Base
 from routers import auth_router, feed_router, comment_router
 
-DATABASE_URL = "sqlite:///./test.db"
+DATABASE_URL = "postgresql://postgres:rjslrjsl333@localhost:5432/postgres"
 engine = create_engine(DATABASE_URL)
 
 UserBase.metadata.create_all(bind=engine)

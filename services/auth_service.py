@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, Request
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from models.user import User
@@ -28,26 +29,27 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 
-def get_user_by_email(db: Session, email: str):
-    return db.query(User).filter(User.email == email).first()
+async def get_user_by_email(db: AsyncSession, email: str):
+    result = await db.execute(select(User).filter_by(email=email))
+    return result.scalar_one_or_none()
 
 
-def create_user(db: Session, user: User):
-    existing_user = get_user_by_email(db, user.email)
+async def create_user(db: AsyncSession, user: User):
+    existing_user = await get_user_by_email(db, user.email)
     if existing_user:
         raise ValueError("Email Already Registered")
 
     hashed_password = get_password_hash(user.password)
     db_user = User(email=user.email, password=hashed_password, nickname=user.nickname)
     db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
+    await db.commit()
+    await db.refresh(db_user)
 
     return db_user
 
 
-def authenticate_user(db: Session, email: str, password: str):
-    user = get_user_by_email(db, email)
+async def authenticate_user(db: AsyncSession, email: str, password: str):
+    user = await get_user_by_email(db, email)
     if not user:
         raise ValueError("Invalid Credentials")
     if not verify_password(password, user.password):
@@ -55,7 +57,7 @@ def authenticate_user(db: Session, email: str, password: str):
     return user
 
 
-def get_current_user_authorization(request: Request):
+async def get_current_user_authorization(request: Request):
     authorization = request.headers.get("Authorization")
     if not authorization:
         raise HTTPException(status_code=401, detail="Not Authenticated")
