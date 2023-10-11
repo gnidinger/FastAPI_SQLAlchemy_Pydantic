@@ -1,6 +1,5 @@
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
-from sqlalchemy import join
 from models.feed import Feed, FeedCreate, FeedUpdate
 from models.user import User
 from config import settings

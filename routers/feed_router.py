@@ -6,7 +6,7 @@ from config.db import get_db
 from typing import List
 import logging
 
-# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
 router = APIRouter()
 
