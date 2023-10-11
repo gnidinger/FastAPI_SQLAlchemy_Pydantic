@@ -1,7 +1,8 @@
-from sqlalchemy import Column, String, Integer, ForeignKey
+from sqlalchemy import Column, String, Integer, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from config.db import Base
 from pydantic import BaseModel
+from typing import List, Optional
 
 
 class Feed(Base):
@@ -11,18 +12,22 @@ class Feed(Base):
     title = Column(String, index=True)
     content = Column(String)
     author_email = Column(String, ForeignKey("users.email"))
+    image_urls = Column(JSON, nullable=True)
 
     author = relationship("User", back_populates="feeds")
+    comments = relationship("Comment", back_populates="feed", post_update=True)
 
 
 class FeedCreate(BaseModel):
     title: str
     content: str
+    image_urls: Optional[List[str]] = []
 
 
 class FeedUpdate(BaseModel):
     title: str
     content: str
+    image_urls: Optional[List[str]] = []
 
 
 class FeedInDB(FeedCreate):
@@ -33,3 +38,4 @@ class FeedResponse(FeedCreate):
     id: int
     author_email: str
     author_nickname: str
+    image_urls: Optional[List[str]]
