@@ -1,5 +1,6 @@
 from fastapi import HTTPException, UploadFile
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from models.feed import Feed, FeedCreate, FeedUpdate
 from models.user import User
 from config import settings
@@ -11,7 +12,9 @@ import logging
 logging.basicConfig(level=logging.NOTSET)
 
 
-def create_feed(db: Session, feed: FeedCreate, author_email: str, images: List[UploadFile] = None):
+async def create_feed(
+    db: AsyncSession, feed: FeedCreate, author_email: str, images: List[UploadFile] = None
+):
     feed_dict = feed.model_dump()
     feed_dict["author_email"] = author_email
 
@@ -19,7 +22,9 @@ def create_feed(db: Session, feed: FeedCreate, author_email: str, images: List[U
         image_urls = upload_image_to_s3(images)
         feed_dict["image_urls"] = image_urls
 
-    author = db.query(User).filter(User.email == author_email).first()
+    author = await db.execute(select(User).where(User.email == author_email))
+    author = author.scalar_one_or_none()
+
     if author is None:
         raise HTTPException(status_code=404, detail="Author Not Found")
 
@@ -27,8 +32,8 @@ def create_feed(db: Session, feed: FeedCreate, author_email: str, images: List[U
 
     db_feed = Feed(**feed_dict)
     db.add(db_feed)
-    db.commit()
-    db.refresh(db_feed)
+    await db.commit()
+    await db.refresh(db_feed)
 
     return {
         "id": db_feed.id,
@@ -40,13 +45,13 @@ def create_feed(db: Session, feed: FeedCreate, author_email: str, images: List[U
     }
 
 
-def get_feed_by_id(db: Session, feed_id: int):
-    feed_data = (
-        db.query(Feed, User.nickname)
+async def get_feed_by_id(db: AsyncSession, feed_id: int):
+    feed_data = await db.execute(
+        select(Feed, User.nickname)
         .join(User, User.email == Feed.author_email)
-        .filter(Feed.id == feed_id)
-        .first()
+        .where(Feed.id == feed_id)
     )
+    feed_data = feed_data.first()
 
     if feed_data is None:
         raise HTTPException(status_code=404, detail="Feed not found")
@@ -63,8 +68,12 @@ def get_feed_by_id(db: Session, feed_id: int):
     }
 
 
-def get_feeds(db: Session):
-    feeds = db.query(Feed, User.nickname).join(User, User.email == Feed.author_email).all()
+async def get_feeds(db: AsyncSession):
+    feeds = await db.execute(
+        select(Feed, User.nickname).join(User, User.email == Feed.author_email)
+    )
+    feeds = feeds.all()
+
     feed_responses = []
 
     for feed, nickname in feeds:
@@ -81,15 +90,16 @@ def get_feeds(db: Session):
     return feed_responses
 
 
-def update_feed(
-    db: Session,
+async def update_feed(
+    db: AsyncSession,
     feed_id: int,
     feed_update: FeedUpdate,
     email: str,
     new_images: Optional[List[UploadFile]] = None,
     target_image_urls: Optional[List[str]] = None,
 ):
-    db_feed = db.query(Feed).filter(Feed.id == feed_id).first()
+    db_feed = await db.execute(select(Feed).where(Feed.id == feed_id))
+    db_feed = db_feed.scalar_one_or_none()
 
     if db_feed is None:
         raise HTTPException(status_code=404, detail="Feed Not Found")
@@ -128,8 +138,8 @@ def update_feed(
     db_feed.image_urls = existing_image_urls
     print(db_feed.image_urls)
 
-    db.commit()
-    db.refresh(db_feed)
+    await db.commit()
+    await db.refresh(db_feed)
 
     result = {
         "id": db_feed.id,
@@ -145,8 +155,9 @@ def update_feed(
     return result
 
 
-def delete_feed(db: Session, feed_id: int, email: str):
-    db_feed = db.query(Feed).filter(Feed.id == feed_id).first()
+async def delete_feed(db: AsyncSession, feed_id: int, email: str):
+    result = await db.execute(select(Feed).where(Feed.id == feed_id))
+    db_feed = result.scalars().first()
 
     if db_feed is None:
         raise HTTPException(status_code=404, detail="Feed Not Found")
@@ -160,7 +171,7 @@ def delete_feed(db: Session, feed_id: int, email: str):
         delete_image_from_s3(image_url)
 
     db.delete(db_feed)
-    db.commit()
+    await db.commit()
 
 
 def upload_image_to_s3(images: List[UploadFile]):
