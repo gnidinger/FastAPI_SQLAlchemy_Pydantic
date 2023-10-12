@@ -172,7 +172,7 @@ async def delete_feed(db: AsyncSession, feed_id: int, email: str):
     for image_url in image_urls:
         await delete_image_from_s3(image_url)
 
-    db.delete(db_feed)
+    await db.delete(db_feed)
     await db.commit()
 
 
