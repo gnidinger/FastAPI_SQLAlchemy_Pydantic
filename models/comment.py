@@ -15,6 +15,7 @@ class Comment(Base):
 
     author = relationship("User", back_populates="comments")
     feed = relationship("Feed", back_populates="comments")
+    likes = relationship("Like", back_populates="comment")
 
 
 class CommentCreate(BaseModel):
