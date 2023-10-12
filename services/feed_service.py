@@ -1,28 +1,30 @@
 from fastapi import HTTPException, UploadFile
-from sqlalchemy.orm import Session
-from sqlalchemy import join
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from models.feed import Feed, FeedCreate, FeedUpdate
 from models.user import User
 from config import settings
 from typing import List, Optional
 import uuid
-from config.s3_config import s3_client
+from config.s3_config import get_s3_client
 import logging
 
 logging.basicConfig(level=logging.NOTSET)
 
 
 async def create_feed(
-    db: Session, feed: FeedCreate, author_email: str, images: List[UploadFile] = None
+    db: AsyncSession, feed: FeedCreate, author_email: str, images: List[UploadFile] = None
 ):
     feed_dict = feed.model_dump()
     feed_dict["author_email"] = author_email
 
     if images:
-        image_urls = upload_image_to_s3(images)
+        image_urls = await upload_image_to_s3(images)
         feed_dict["image_urls"] = image_urls
 
-    author = db.query(User).filter(User.email == author_email).first()
+    author = await db.execute(select(User).where(User.email == author_email))
+    author = author.scalar_one_or_none()
+
     if author is None:
         raise HTTPException(status_code=404, detail="Author Not Found")
 
@@ -30,8 +32,8 @@ async def create_feed(
 
     db_feed = Feed(**feed_dict)
     db.add(db_feed)
-    db.commit()
-    db.refresh(db_feed)
+    await db.commit()
+    await db.refresh(db_feed)
 
     return {
         "id": db_feed.id,
@@ -43,13 +45,13 @@ async def create_feed(
     }
 
 
-async def get_feed_by_id(db: Session, feed_id: int):
-    feed_data = (
-        db.query(Feed, User.nickname)
+async def get_feed_by_id(db: AsyncSession, feed_id: int):
+    feed_data = await db.execute(
+        select(Feed, User.nickname)
         .join(User, User.email == Feed.author_email)
-        .filter(Feed.id == feed_id)
-        .first()
+        .where(Feed.id == feed_id)
     )
+    feed_data = feed_data.first()
 
     if feed_data is None:
         raise HTTPException(status_code=404, detail="Feed not found")
@@ -66,8 +68,12 @@ async def get_feed_by_id(db: Session, feed_id: int):
     }
 
 
-async def get_feeds(db: Session):
-    feeds = db.query(Feed, User.nickname).join(User, User.email == Feed.author_email).all()
+async def get_feeds(db: AsyncSession):
+    feeds = await db.execute(
+        select(Feed, User.nickname).join(User, User.email == Feed.author_email)
+    )
+    feeds = feeds.all()
+
     feed_responses = []
 
     for feed, nickname in feeds:
@@ -85,14 +91,15 @@ async def get_feeds(db: Session):
 
 
 async def update_feed(
-    db: Session,
+    db: AsyncSession,
     feed_id: int,
     feed_update: FeedUpdate,
     email: str,
     new_images: Optional[List[UploadFile]] = None,
     target_image_urls: Optional[List[str]] = None,
 ):
-    db_feed = db.query(Feed).filter(Feed.id == feed_id).first()
+    db_feed = await db.execute(select(Feed).where(Feed.id == feed_id))
+    db_feed = db_feed.scalar_one_or_none()
 
     if db_feed is None:
         raise HTTPException(status_code=404, detail="Feed Not Found")
@@ -100,7 +107,9 @@ async def update_feed(
     if db_feed.author_email != email:
         raise HTTPException(status_code=403, detail="Permission Denied")
 
-    author = db.query(User).filter(User.email == email).first()
+    result = await db.execute(select(User).where(User.email == email))
+    author = result.scalar_one_or_none()
+
     author_nickname = author.nickname
 
     db_feed.title = feed_update.title
@@ -112,27 +121,27 @@ async def update_feed(
     if new_images and target_image_urls:
         for url in target_image_urls:
             print(url)
-            delete_image_from_s3(url)
-        new_image_urls = upload_image_to_s3(new_images)
+            await delete_image_from_s3(url)
+        new_image_urls = await upload_image_to_s3(new_images)
         existing_image_urls = [url for url in existing_image_urls if url not in target_image_urls]
         existing_image_urls = existing_image_urls + new_image_urls
 
     # Case 2: Only new_images exist
     elif new_images:
-        new_image_urls = upload_image_to_s3(new_images)
+        new_image_urls = await upload_image_to_s3(new_images)
         existing_image_urls = existing_image_urls + new_image_urls
 
     # Case 3: Only target_image_urls exist
     elif target_image_urls:
         for url in target_image_urls:
-            delete_image_from_s3(url)
+            await delete_image_from_s3(url)
         existing_image_urls = [url for url in existing_image_urls if url not in target_image_urls]
 
     db_feed.image_urls = existing_image_urls
     print(db_feed.image_urls)
 
-    db.commit()
-    db.refresh(db_feed)
+    await db.commit()
+    await db.refresh(db_feed)
 
     result = {
         "id": db_feed.id,
@@ -148,8 +157,9 @@ async def update_feed(
     return result
 
 
-async def delete_feed(db: Session, feed_id: int, email: str):
-    db_feed = db.query(Feed).filter(Feed.id == feed_id).first()
+async def delete_feed(db: AsyncSession, feed_id: int, email: str):
+    result = await db.execute(select(Feed).where(Feed.id == feed_id))
+    db_feed = result.scalars().first()
 
     if db_feed is None:
         raise HTTPException(status_code=404, detail="Feed Not Found")
@@ -160,33 +170,37 @@ async def delete_feed(db: Session, feed_id: int, email: str):
     image_urls = db_feed.image_urls
 
     for image_url in image_urls:
-        delete_image_from_s3(image_url)
+        await delete_image_from_s3(image_url)
 
-    db.delete(db_feed)
-    db.commit()
+    await db.delete(db_feed)
+    await db.commit()
 
 
-def upload_image_to_s3(images: List[UploadFile]):
+async def upload_image_to_s3(images: List[UploadFile]):
     image_urls = []
-    for image in images:
-        logging.debug(f"Uploading {image.filename}")
-        image_name = f"{uuid.uuid4()}.png"
-        s3_client.upload_fileobj(
-            image.file,
-            settings.S3_BUCKET,
-            image_name,
-            ExtraArgs={"ContentType": image.content_type},
-        )
-        image_url = f"https://{settings.S3_BUCKET}.s3.ap-northeast-2.amazonaws.com/{image_name}"
-        image_urls.append(image_url)
+
+    async with await get_s3_client() as s3_client:
+        for image in images:
+            logging.debug(f"Uploading {image.filename}")
+            image_name = f"{uuid.uuid4()}.png"
+
+            await s3_client.upload_fileobj(
+                image.file,
+                settings.S3_BUCKET,
+                image_name,
+                ExtraArgs={"ContentType": image.content_type},
+            )
+
+            image_url = f"https://{settings.S3_BUCKET}.s3.ap-northeast-2.amazonaws.com/{image_name}"
+            image_urls.append(image_url)
 
     return image_urls
 
 
-def delete_image_from_s3(image_url: str):
+async def delete_image_from_s3(image_url: str):
     image_name = image_url.split("/")[-1]
     bucket_name = settings.S3_BUCKET
-
     logging.debug(f"Deleting from Bucket: {bucket_name}, Key: {image_name}")
 
-    s3_client.delete_object(Bucket=settings.S3_BUCKET, Key=image_name)
+    async with await get_s3_client() as s3_client:
+        await s3_client.delete_object(Bucket=settings.S3_BUCKET, Key=image_name)

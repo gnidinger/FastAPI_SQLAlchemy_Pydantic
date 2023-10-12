@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 from config import db as config
 from models.user import UserCreate, UserLogin, UserResponse
 from services import auth_service
@@ -8,20 +8,20 @@ router = APIRouter()
 
 
 @router.post("/signup", response_model=UserResponse)
-def signup(user: UserCreate, db: Session = Depends(config.get_db)):
+async def signup(user: UserCreate, db: AsyncSession = Depends(config.get_db)):
     try:
-        db_user = auth_service.create_user(db, user)
+        db_user = await auth_service.create_user(db, user)
         return {"email": db_user.email, "nickname": db_user.nickname}
     except ValueError:
         raise HTTPException(status_code=400, detail="Email Already Registered")
 
 
 @router.post("/login")
-def login(user: UserLogin, db: Session = Depends(config.get_db)):
+async def login(user: UserLogin, db: AsyncSession = Depends(config.get_db)):
     try:
-        db_user = auth_service.authenticate_user(db, user.email, user.password)
+        db_user = await auth_service.authenticate_user(db, user.email, user.password)
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid Credentials")
 
-    access_token = auth_service.create_access_token({"sub": user.email})
+    access_token = auth_service.create_access_token({"sub": user.email})  # 이 부분은 비동기가 아님
     return {"email": db_user.email, "nickname": db_user.nickname, "access_token": access_token}
