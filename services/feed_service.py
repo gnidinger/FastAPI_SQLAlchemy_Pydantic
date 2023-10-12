@@ -184,7 +184,6 @@ async def upload_image_to_s3(images: List[UploadFile]):
             logging.debug(f"Uploading {image.filename}")
             image_name = f"{uuid.uuid4()}.png"
 
-            # upload_fileobj 메서드를 호출합니다.
             await s3_client.upload_fileobj(
                 image.file,
                 settings.S3_BUCKET,
