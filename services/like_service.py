@@ -27,7 +27,7 @@ async def toggle_like(
 
     # 좋아요가 이미 있다면 삭제, 없다면 추가
     if existing_like:
-        db.delete(existing_like)
+        await db.delete(existing_like)
     else:
         new_like = Like(user_email=user_email, feed_id=feed_id, comment_id=comment_id)
         db.add(new_like)
