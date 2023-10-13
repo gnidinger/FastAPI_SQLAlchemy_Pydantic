@@ -29,6 +29,11 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 
+async def get_user_by_id(db: AsyncSession, user_id: int):
+    result = await db.execute(select(User).filter_by(id=user_id))
+    return result.scalar_one_or_none()
+
+
 async def get_user_by_email(db: AsyncSession, email: str):
     result = await db.execute(select(User).filter_by(email=email))
     return result.scalar_one_or_none()
