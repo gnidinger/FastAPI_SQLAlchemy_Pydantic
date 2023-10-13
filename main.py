@@ -3,7 +3,8 @@ from sqlalchemy import create_engine
 from models.user import Base as UserBase  # User의 Base 클래스
 from models.feed import Base as FeedBase  # Feed의 Base 클래스
 from models.comment import Base as CommentBase  # Comment의 Base
-from routers import auth_router, feed_router, comment_router
+from models.like import Base as LikeBase  # Like의 Base 클래스
+from routers import auth_router, feed_router, comment_router, like_router
 from config.cors_config import setup_cors
 
 DATABASE_URL = "postgresql://postgres:rjslrjsl333@localhost:5432/postgres"
@@ -12,6 +13,7 @@ engine = create_engine(DATABASE_URL)
 UserBase.metadata.create_all(bind=engine)
 FeedBase.metadata.create_all(bind=engine)
 CommentBase.metadata.create_all(bind=engine)
+LikeBase.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
@@ -20,6 +22,7 @@ setup_cors(app)
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(feed_router.router, prefix="/api/feed", tags=["feed"])
 app.include_router(comment_router.router, prefix="/api/comment", tags=["comment"])
+app.include_router(like_router.router, prefix="/api/like", tags=["like"])
 
 
 @app.get("/")
