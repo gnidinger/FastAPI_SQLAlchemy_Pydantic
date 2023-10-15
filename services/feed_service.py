@@ -1,7 +1,8 @@
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from models.feed import Feed, FeedCreate, FeedUpdate
+from sqlalchemy import desc, asc, func
+from models.feed import Feed, FeedCreate, FeedUpdate, FeedResponse, FeedListResponse
 from models.user import User
 from config import settings
 from typing import List, Optional
@@ -66,6 +67,69 @@ async def get_feed_by_id(db: AsyncSession, feed_id: int):
         "author_nickname": nickname,
         "image_urls": feed.image_urls,
     }
+
+
+async def get_feeds_by_user(
+    db: AsyncSession,
+    user_id: int = None,
+    nickname: str = None,
+    email: str = None,
+    skip: int = 0,
+    limit: int = 10,
+    sort_by: str = "id_desc",
+):
+    if not user_id and not nickname and not email:
+        raise HTTPException(
+            status_code=400, detail="Either user_id, nickname, or email must be provided"
+        )
+
+    query = select(Feed, User.nickname).join(User, User.email == Feed.author_email)
+
+    condition = None
+    if user_id:
+        condition = User.id == user_id
+    elif nickname:
+        condition = User.nickname == nickname
+    elif email:
+        condition = User.email == email
+
+    query = query.where(condition)
+
+    if sort_by == "id_desc":
+        query = query.order_by(desc(Feed.id))
+    elif sort_by == "id_asc":
+        query = query.order_by(asc(Feed.id))
+
+    total_count_result = await db.execute(select(func.count()).select_from(Feed).where(condition))
+    total_count = total_count_result.scalar_one_or_none()
+    if total_count is None:
+        total_count = 0
+
+    print(f"total_count type: {type(total_count)} value: {total_count}")
+
+    total_count = int(total_count)
+
+    query = query.offset(skip).limit(limit)
+
+    feeds_result = await db.execute(query)
+    feeds = feeds_result.all()
+    if feeds is None:
+        feeds = []
+
+    feed_responses = []
+
+    for feed, nickname in feeds:
+        feed_dict = FeedResponse(
+            id=feed.id,
+            title=feed.title,
+            content=feed.content,
+            author_email=feed.author_email,
+            author_nickname=nickname,
+            image_urls=feed.image_urls,
+        )
+        feed_responses.append(feed_dict.dict())
+
+    return total_count, feed_responses
 
 
 async def get_feeds(db: AsyncSession):

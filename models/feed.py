@@ -40,3 +40,8 @@ class FeedResponse(FeedCreate):
     author_email: str
     author_nickname: str
     image_urls: Optional[List[str]]
+
+
+class FeedListResponse(BaseModel):
+    total_count: int
+    feeds: List[FeedResponse]
