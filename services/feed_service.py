@@ -87,7 +87,7 @@ async def get_feeds_by_user(
     email: str = None,
     skip: int = 0,
     limit: int = 10,
-    sort_by: str = "id_desc",
+    sort_by: str = "create_dt_desc",
 ):
     if not user_id and not nickname and not email:
         raise HTTPException(
@@ -110,6 +110,10 @@ async def get_feeds_by_user(
         query = query.order_by(desc(Feed.id))
     elif sort_by == "id_asc":
         query = query.order_by(asc(Feed.id))
+    elif sort_by == "create_dt_desc":
+        query = query.order_by(desc(Feed.create_dt))
+    elif sort_by == "create_dt_asc":
+        query = query.order_by(asc(Feed.create_dt))
 
     total_count_result = await db.execute(select(func.count()).select_from(Feed).where(condition))
     total_count = total_count_result.scalar_one_or_none()
