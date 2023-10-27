@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import desc, asc
 from models.comment import Comment, CommentCreate, CommentUpdate
 from models.user import User
 from models.feed import Feed
@@ -50,9 +51,21 @@ async def create_comment(db: AsyncSession, comment: CommentCreate, author_email:
     }
 
 
-async def get_comment_by_feed_id(db: AsyncSession, feed_id: int):
-    comments = await db.execute(select(Comment).where(Comment.feed_id == feed_id))
-    comments = comments.scalars().all()
+async def get_comment_by_feed_id(
+    db: AsyncSession, feed_id: int, skip: int = 0, limit: int = 10, sort_by: str = "create_dt_desc"
+):
+    query = select(Comment).where(Comment.feed_id == feed_id)
+
+    if sort_by == "create_dt_desc":
+        query = query.order_by(desc(Comment.create_dt))
+    elif sort_by == "create_dt_asc":
+        query = query.order_by(asc(Comment.create_dt))
+
+    query = query.offset(skip).limit(limit)
+
+    comments_result = await db.execute(query)
+    comments = comments_result.scalars().all()
+
     comment_responses = []
 
     for comment in comments:
