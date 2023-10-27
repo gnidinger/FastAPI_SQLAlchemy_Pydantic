@@ -49,8 +49,13 @@ async def list_feeds_by_user(
 
 
 @router.get("/list", response_model=List[FeedResponse])
-async def list_feeds(db: AsyncSession = Depends(get_db)):
-    return await feed_service.get_feeds(db)
+async def list_feeds(
+    skip: int = 0,
+    limit: int = 10,
+    sort_by: str = "create_dt_desc",
+    db: AsyncSession = Depends(get_db),
+):
+    return await feed_service.get_feeds(db, skip=skip, limit=limit, sort_by=sort_by)
 
 
 @router.patch("/update/{feed_id}", response_model=FeedResponse)

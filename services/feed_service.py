@@ -149,11 +149,29 @@ async def get_feeds_by_user(
     return total_count, feed_responses
 
 
-async def get_feeds(db: AsyncSession):
-    feeds = await db.execute(
-        select(Feed, User.nickname).join(User, User.email == Feed.author_email)
-    )
-    feeds = feeds.all()
+async def get_feeds(
+    db: AsyncSession,
+    skip: int = 0,
+    limit: int = 10,
+    sort_by: str = "create_dt_desc",
+):
+    query = select(Feed, User.nickname).join(User, User.email == Feed.author_email)
+
+    # 정렬 로직 추가
+    if sort_by == "id_desc":
+        query = query.order_by(desc(Feed.id))
+    elif sort_by == "id_asc":
+        query = query.order_by(asc(Feed.id))
+    elif sort_by == "create_dt_desc":
+        query = query.order_by(desc(Feed.create_dt))
+    elif sort_by == "create_dt_asc":
+        query = query.order_by(asc(Feed.create_dt))
+
+    # 페이지네이션 로직 추가
+    query = query.offset(skip).limit(limit)
+
+    feeds_result = await db.execute(query)
+    feeds = feeds_result.all()
 
     feed_responses = []
 
