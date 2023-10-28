@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func
 from sqlalchemy.orm import relationship
 from config.db import Base
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -41,3 +41,8 @@ class CommentResponse(CommentCreate):
     author_nickname: str
     create_dt: datetime
     update_dt: datetime
+
+
+class CommentListResponse(BaseModel):
+    total_count: int
+    comments: List[CommentResponse]

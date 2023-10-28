@@ -38,10 +38,29 @@ async def user_feeds(
 
 @router.get("/comments")
 async def user_comments(
-    db: AsyncSession = Depends(get_db), email: str = Depends(get_current_user_authorization)
+    db: AsyncSession = Depends(get_db),
+    email: str = Depends(get_current_user_authorization),
+    skip: int = 0,
+    limit: int = 10,
+    sort_by: str = "create_dt_desc",
 ):
-    comments = await get_user_comments(db, email)
-    return comments
+    result = await get_user_comments(db, email, skip, limit, sort_by)
+    total_count = result["total_count"]
+    comments = result["comments"]
+
+    current_page = (skip // limit) + 1
+    total_pages = -(-total_count // limit)  # Ceiling division in Python
+    is_last_page = (skip + limit) >= total_count
+
+    return {
+        "total_count": total_count,
+        "comments": comments,
+        "pagination": {
+            "current_page": current_page,
+            "total_pages": total_pages,
+            "is_last_page": is_last_page,
+        },
+    }
 
 
 @router.get("/{user_id}/followers")
