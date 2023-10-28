@@ -131,12 +131,26 @@ async def get_user_comments(
     return {"total_count": total_count, "comments": comment_responses}
 
 
-async def get_user_followers(db: AsyncSession, user_id: int):
+async def get_user_followers(db: AsyncSession, user_id: int, skip: int = 0, limit: int = 10):
+    # 전체 팔로워 수를 구하는 쿼리
+    count_query = (
+        select(func.count())
+        .select_from(User)
+        .join(Follow, Follow.follower_id == User.id)
+        .where(Follow.following_id == user_id)
+    )
+    total_count_result = await db.execute(count_query)
+    total_count = total_count_result.scalar_one_or_none()
+    if total_count is None:
+        total_count = 0
+
     # 사용자를 팔로우하는 사람들의 목록 가져오기
     query = (
         select(User)
         .join(Follow, Follow.follower_id == User.id)
         .where(Follow.following_id == user_id)
+        .offset(skip)
+        .limit(limit)
     )
     result = await db.execute(query)
     followers = result.scalars().all()
@@ -147,15 +161,29 @@ async def get_user_followers(db: AsyncSession, user_id: int):
             "nickname": user.nickname,
         }
 
-    return [extract_profile(user) for user in followers]
+    return total_count, [extract_profile(user) for user in followers]
 
 
-async def get_user_followings(db: AsyncSession, user_id: int):
+async def get_user_followings(db: AsyncSession, user_id: int, skip: int = 0, limit: int = 10):
+    # 전체 팔로잉 수를 구하는 쿼리
+    count_query = (
+        select(func.count())
+        .select_from(User)
+        .join(Follow, Follow.following_id == User.id)
+        .where(Follow.follower_id == user_id)
+    )
+    total_count_result = await db.execute(count_query)
+    total_count = total_count_result.scalar_one_or_none()
+    if total_count is None:
+        total_count = 0
+
     # 사용자가 팔로우하는 사람들의 목록 가져오기
     query = (
         select(User)
         .join(Follow, Follow.following_id == User.id)
         .where(Follow.follower_id == user_id)
+        .offset(skip)
+        .limit(limit)
     )
     result = await db.execute(query)
     followings = result.scalars().all()
@@ -163,7 +191,7 @@ async def get_user_followings(db: AsyncSession, user_id: int):
     def extract_profile(user):
         return {
             "email": user.email,
-            "nickname": user.nickname,  # 가정: User 모델에 'nickname' 필드가 있다.
+            "nickname": user.nickname,
         }
 
-    return [extract_profile(user) for user in followings]
+    return total_count, [extract_profile(user) for user in followings]

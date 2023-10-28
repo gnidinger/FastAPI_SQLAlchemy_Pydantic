@@ -32,8 +32,21 @@ async def user_feeds(
     limit: int = 10,
     sort_by: str = "create_dt_desc",
 ):
-    total_count, feed_responses = await get_user_feeds(db, email, skip, limit, sort_by)
-    return FeedListResponse(total_count=total_count, feeds=feed_responses)
+    total_count, feeds = await get_user_feeds(db, email, skip, limit, sort_by)
+
+    current_page = (skip // limit) + 1
+    total_pages = -(-total_count // limit)
+    is_last_page = (skip + limit) >= total_count
+
+    return {
+        "feeds": feeds,
+        "pagination": {
+            "current_page": current_page,
+            "total_pages": total_pages,
+            "is_last_page": is_last_page,
+            "total_count": total_count,
+        },
+    }
 
 
 @router.get("/comments")
@@ -53,23 +66,53 @@ async def user_comments(
     is_last_page = (skip + limit) >= total_count
 
     return {
-        "total_count": total_count,
         "comments": comments,
         "pagination": {
             "current_page": current_page,
             "total_pages": total_pages,
             "is_last_page": is_last_page,
+            "total_count": total_count,
         },
     }
 
 
 @router.get("/{user_id}/followers")
-async def user_followers(user_id: int, db: AsyncSession = Depends(get_db)):
-    followers = await get_user_followers(db, user_id)
-    return followers
+async def user_followers(
+    user_id: int, skip: int = 0, limit: int = 10, db: AsyncSession = Depends(get_db)
+):
+    total_count, followers = await get_user_followers(db, user_id, skip, limit)
+
+    current_page = (skip // limit) + 1
+    total_pages = -(-total_count // limit)  # Ceiling division in Python
+    is_last_page = (skip + limit) >= total_count
+
+    return {
+        "followers": followers,
+        "pagination": {
+            "current_page": current_page,
+            "total_pages": total_pages,
+            "is_last_page": is_last_page,
+            "total_count": total_count,
+        },
+    }
 
 
 @router.get("/{user_id}/followings")
-async def user_followings(user_id: int, db: AsyncSession = Depends(get_db)):
-    followings = await get_user_followings(db, user_id)
-    return followings
+async def user_followings(
+    user_id: int, skip: int = 0, limit: int = 10, db: AsyncSession = Depends(get_db)
+):
+    total_count, followings = await get_user_followings(db, user_id, skip, limit)
+
+    current_page = (skip // limit) + 1
+    total_pages = -(-total_count // limit)  # Ceiling division in Python
+    is_last_page = (skip + limit) >= total_count
+
+    return {
+        "followings": followings,
+        "pagination": {
+            "current_page": current_page,
+            "total_pages": total_pages,
+            "is_last_page": is_last_page,
+            "total_count": total_count,
+        },
+    }
