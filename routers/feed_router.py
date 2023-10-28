@@ -48,14 +48,28 @@ async def list_feeds_by_user(
     return FeedListResponse(total_count=total_count, feeds=feed_responses)
 
 
-@router.get("/list", response_model=List[FeedResponse])
+@router.get("/list")
 async def list_feeds(
+    db: AsyncSession = Depends(get_db),
     skip: int = 0,
     limit: int = 10,
     sort_by: str = "create_dt_desc",
-    db: AsyncSession = Depends(get_db),
 ):
-    return await feed_service.get_feeds(db, skip=skip, limit=limit, sort_by=sort_by)
+    total_count, feeds = await feed_service.get_feeds(db, skip, limit, sort_by)
+
+    current_page = (skip // limit) + 1
+    total_pages = -(-total_count // limit)
+    is_last_page = (skip + limit) >= total_count
+
+    return {
+        "feeds": feeds,
+        "pagination": {
+            "current_page": current_page,
+            "total_pages": total_pages,
+            "is_last_page": is_last_page,
+            "total_count": total_count,
+        },
+    }
 
 
 @router.patch("/update/{feed_id}", response_model=FeedResponse)

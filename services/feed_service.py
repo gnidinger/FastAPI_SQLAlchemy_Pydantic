@@ -157,38 +157,45 @@ async def get_feeds(
 ):
     query = select(Feed, User.nickname).join(User, User.email == Feed.author_email)
 
-    # 정렬 로직 추가
-    if sort_by == "id_desc":
-        query = query.order_by(desc(Feed.id))
-    elif sort_by == "id_asc":
-        query = query.order_by(asc(Feed.id))
-    elif sort_by == "create_dt_desc":
+    if sort_by == "create_dt_desc":
         query = query.order_by(desc(Feed.create_dt))
     elif sort_by == "create_dt_asc":
         query = query.order_by(asc(Feed.create_dt))
+    elif sort_by == "update_dt_desc":
+        query = query.order_by(desc(Feed.update_dt))
+    elif sort_by == "update_dt_asc":
+        query = query.order_by(asc(Feed.update_dt))
 
-    # 페이지네이션 로직 추가
+    total_count_result = await db.execute(select(func.count()).select_from(Feed))
+    total_count = total_count_result.scalar_one_or_none()
+    if total_count is None:
+        total_count = 0
+
+    total_count = int(total_count)
+
     query = query.offset(skip).limit(limit)
 
     feeds_result = await db.execute(query)
     feeds = feeds_result.all()
+    if feeds is None:
+        feeds = []
 
     feed_responses = []
 
     for feed, nickname in feeds:
-        feed_dict = {
-            "id": feed.id,
-            "title": feed.title,
-            "content": feed.content,
-            "author_email": feed.author_email,
-            "author_nickname": nickname,
-            "image_urls": feed.image_urls,
-            "create_dt": feed.create_dt,
-            "update_dt": feed.update_dt,
-        }
-        feed_responses.append(feed_dict)
+        feed_dict = FeedResponse(
+            id=feed.id,
+            title=feed.title,
+            content=feed.content,
+            author_email=feed.author_email,
+            author_nickname=nickname,
+            image_urls=feed.image_urls,
+            create_dt=feed.create_dt,
+            update_dt=feed.update_dt,
+        )
+        feed_responses.append(feed_dict.model_dump())
 
-    return feed_responses
+    return total_count, feed_responses
 
 
 async def update_feed(

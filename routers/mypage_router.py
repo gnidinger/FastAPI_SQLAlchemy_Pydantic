@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from models.feed import FeedListResponse
 from config.db import get_db
 from services.mypage_service import (
     get_user_profile,
