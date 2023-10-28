@@ -20,7 +20,7 @@ async def get_user_profile(db: AsyncSession, user_email: str):
         raise HTTPException(status_code=404, detail="User profile not found.")
 
     user_data = user_profile.__dict__
-    user_data.pop("password", None)
+    user_data.pop("password", None)  # 비밀번호 정보 제거
 
     return user_data
 
@@ -32,6 +32,7 @@ async def get_user_feeds(
     limit: int = 10,
     sort_by: str = "create_dt_desc",
 ):
+    # 사용자 이메일에 해당하는 피드 조회 쿼리
     query = select(Feed, User.nickname).join(User, User.email == Feed.author_email)
 
     condition = User.email == email
@@ -41,9 +42,9 @@ async def get_user_feeds(
         query = query.order_by(desc(Feed.create_dt))
     elif sort_by == "create_dt_asc":
         query = query.order_by(asc(Feed.create_dt))
-    elif sort_by == "update_dt_desc":  # update_dt 내림차순 정렬 조건 추가
+    elif sort_by == "update_dt_desc":
         query = query.order_by(desc(Feed.update_dt))
-    elif sort_by == "update_dt_asc":  # update_dt 오름차순 정렬 조건 추가
+    elif sort_by == "update_dt_asc":
         query = query.order_by(asc(Feed.update_dt))
 
     total_count_result = await db.execute(select(func.count()).select_from(Feed).where(condition))
@@ -85,6 +86,7 @@ async def get_user_comments(
     limit: int = 10,
     sort_by: str = "create_dt_desc",
 ):
+    # 사용자 이메일에 해당하는 댓글 조회 쿼리
     query = select(Comment, User.nickname).join(User, User.email == Comment.author_email)
     condition = User.email == user_email
     query = query.where(condition)
@@ -161,7 +163,7 @@ async def get_user_followers(db: AsyncSession, user_id: int, skip: int = 0, limi
             "nickname": user.nickname,
         }
 
-    return total_count, [extract_profile(user) for user in followers]
+    return {"total_count": total_count, "followers": [extract_profile(user) for user in followers]}
 
 
 async def get_user_followings(db: AsyncSession, user_id: int, skip: int = 0, limit: int = 10):
@@ -194,4 +196,7 @@ async def get_user_followings(db: AsyncSession, user_id: int, skip: int = 0, lim
             "nickname": user.nickname,
         }
 
-    return total_count, [extract_profile(user) for user in followings]
+    return {
+        "total_count": total_count,
+        "followings": [extract_profile(user) for user in followings],
+    }

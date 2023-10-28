@@ -79,10 +79,13 @@ async def user_comments(
 async def user_followers(
     user_id: int, skip: int = 0, limit: int = 10, db: AsyncSession = Depends(get_db)
 ):
-    total_count, followers = await get_user_followers(db, user_id, skip, limit)
+    result_dict = await get_user_followers(db, user_id, skip, limit)
+
+    total_count = result_dict["total_count"]
+    followers = result_dict["followers"]
 
     current_page = (skip // limit) + 1
-    total_pages = -(-total_count // limit)  # Ceiling division in Python
+    total_pages = -(-total_count // limit)
     is_last_page = (skip + limit) >= total_count
 
     return {
@@ -100,10 +103,13 @@ async def user_followers(
 async def user_followings(
     user_id: int, skip: int = 0, limit: int = 10, db: AsyncSession = Depends(get_db)
 ):
-    total_count, followings = await get_user_followings(db, user_id, skip, limit)
+    result_dict = await get_user_followings(db, user_id, skip, limit)
+
+    total_count = result_dict["total_count"]
+    followings = result_dict["followings"]
 
     current_page = (skip // limit) + 1
-    total_pages = -(-total_count // limit)  # Ceiling division in Python
+    total_pages = -(-total_count // limit)
     is_last_page = (skip + limit) >= total_count
 
     return {
