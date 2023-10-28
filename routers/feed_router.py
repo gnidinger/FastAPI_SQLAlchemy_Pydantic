@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
-from models.feed import FeedCreate, FeedResponse, FeedUpdate
+from models.feed import FeedCreate, FeedResponse, FeedUpdate, FeedListResponse
 from services import feed_service, auth_service
 from config.db import get_db
 from typing import List
@@ -32,9 +32,44 @@ async def read_feed(feed_id: int, db: AsyncSession = Depends(get_db)):
     return await feed_service.get_feed_by_id(db, feed_id)
 
 
-@router.get("/list", response_model=List[FeedResponse])
-async def list_feeds(db: AsyncSession = Depends(get_db)):
-    return await feed_service.get_feeds(db)
+@router.get("/list-by-user", response_model=FeedListResponse)
+async def list_feeds_by_user(
+    user_id: int = None,
+    nickname: str = None,
+    email: str = None,
+    skip: int = 0,
+    limit: int = 10,
+    sort_by: str = "id_desc",  # 정렬 옵션 추가
+    db: AsyncSession = Depends(get_db),
+):
+    total_count, feed_responses = await feed_service.get_feeds_by_user(
+        db, user_id=user_id, nickname=nickname, email=email, skip=skip, limit=limit, sort_by=sort_by
+    )
+    return FeedListResponse(total_count=total_count, feeds=feed_responses)
+
+
+@router.get("/list")
+async def list_feeds(
+    db: AsyncSession = Depends(get_db),
+    skip: int = 0,
+    limit: int = 10,
+    sort_by: str = "create_dt_desc",
+):
+    total_count, feeds = await feed_service.get_feeds(db, skip, limit, sort_by)
+
+    current_page = (skip // limit) + 1
+    total_pages = -(-total_count // limit)
+    is_last_page = (skip + limit) >= total_count
+
+    return {
+        "feeds": feeds,
+        "pagination": {
+            "current_page": current_page,
+            "total_pages": total_pages,
+            "is_last_page": is_last_page,
+            "total_count": total_count,
+        },
+    }
 
 
 @router.patch("/update/{feed_id}", response_model=FeedResponse)

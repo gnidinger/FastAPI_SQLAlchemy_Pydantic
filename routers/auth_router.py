@@ -11,7 +11,11 @@ router = APIRouter()
 async def signup(user: UserCreate, db: AsyncSession = Depends(config.get_db)):
     try:
         db_user = await auth_service.create_user(db, user)
-        return {"email": db_user.email, "nickname": db_user.nickname}
+        return {
+            "email": db_user.email,
+            "nickname": db_user.nickname,
+            "create_dt": db_user.create_dt,
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -5,6 +5,7 @@ from sqlalchemy.future import select
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from models.user import User
+import pytz
 
 SECRET_KEY = "ThisIsTheSecretKeyOfFastAPIApplicationWithSQLAlchemyAndPydantic"
 ALGORITHM = "HS256"
@@ -45,7 +46,16 @@ async def create_user(db: AsyncSession, user: User):
         raise ValueError("Email Already Registered")
 
     hashed_password = get_password_hash(user.password)
-    db_user = User(email=user.email, password=hashed_password, nickname=user.nickname)
+
+    korea = pytz.timezone("Asia/Seoul")
+    current_time_in_korea = datetime.now(korea)
+
+    db_user = User(
+        email=user.email,
+        password=hashed_password,
+        nickname=user.nickname,
+        create_dt=current_time_in_korea,
+    )
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)

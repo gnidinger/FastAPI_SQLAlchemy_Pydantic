@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, Integer, Sequence
+from sqlalchemy import Column, String, Integer, DateTime, func
+from datetime import datetime
 from sqlalchemy.orm import relationship
 from config.db import Base
 from pydantic import BaseModel, validator
@@ -12,6 +13,7 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     password = Column(String())
     nickname = Column(String())
+    create_dt = Column(DateTime(timezone=True), server_default=func.now())
 
     feeds = relationship("Feed", back_populates="author")
     comments = relationship("Comment", back_populates="author", post_update=True)
@@ -25,7 +27,7 @@ class UserCreate(BaseModel):
 
 
 class UserInDB(UserCreate):
-    pass
+    createDt: datetime
 
 
 class UserLogin(BaseModel):
@@ -42,3 +44,4 @@ class UserLogin(BaseModel):
 class UserResponse(BaseModel):
     email: str
     nickname: str
+    create_dt: datetime

@@ -1,12 +1,15 @@
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timedelta
 from sqlalchemy.future import select
-from models.feed import Feed, FeedCreate, FeedUpdate
+from sqlalchemy import desc, asc, func
+from models.feed import Feed, FeedCreate, FeedUpdate, FeedResponse, FeedListResponse
 from models.user import User
 from config import settings
 from typing import List, Optional
 import uuid
 from config.s3_config import get_s3_client
+import pytz
 import logging
 
 logging.basicConfig(level=logging.NOTSET)
@@ -17,6 +20,11 @@ async def create_feed(
 ):
     feed_dict = feed.model_dump()
     feed_dict["author_email"] = author_email
+
+    korea = pytz.timezone("Asia/Seoul")
+    current_time_in_korea = datetime.now(korea)
+    feed_dict["create_dt"] = current_time_in_korea
+    feed_dict["update_dt"] = current_time_in_korea
 
     if images:
         image_urls = await upload_image_to_s3(images)
@@ -42,6 +50,8 @@ async def create_feed(
         "author_email": db_feed.author_email,
         "author_nickname": author_nickname,
         "image_urls": db_feed.image_urls,
+        "create_dt": db_feed.create_dt,
+        "update_dt": db_feed.update_dt,
     }
 
 
@@ -65,29 +75,127 @@ async def get_feed_by_id(db: AsyncSession, feed_id: int):
         "author_email": feed.author_email,
         "author_nickname": nickname,
         "image_urls": feed.image_urls,
+        "create_dt": feed.create_dt,
+        "update_dt": feed.update_dt,
     }
 
 
-async def get_feeds(db: AsyncSession):
-    feeds = await db.execute(
-        select(Feed, User.nickname).join(User, User.email == Feed.author_email)
-    )
-    feeds = feeds.all()
+async def get_feeds_by_user(
+    db: AsyncSession,
+    user_id: int = None,
+    nickname: str = None,
+    email: str = None,
+    skip: int = 0,
+    limit: int = 10,
+    sort_by: str = "create_dt_desc",
+):
+    if not user_id and not nickname and not email:
+        raise HTTPException(
+            status_code=400, detail="Either user_id, nickname, or email must be provided"
+        )
+
+    query = select(Feed, User.nickname).join(User, User.email == Feed.author_email)
+
+    condition = None
+    if user_id:
+        condition = User.id == user_id
+    elif nickname:
+        condition = User.nickname == nickname
+    elif email:
+        condition = User.email == email
+
+    query = query.where(condition)
+
+    if sort_by == "id_desc":
+        query = query.order_by(desc(Feed.id))
+    elif sort_by == "id_asc":
+        query = query.order_by(asc(Feed.id))
+    elif sort_by == "create_dt_desc":
+        query = query.order_by(desc(Feed.create_dt))
+    elif sort_by == "create_dt_asc":
+        query = query.order_by(asc(Feed.create_dt))
+
+    total_count_result = await db.execute(select(func.count()).select_from(Feed).where(condition))
+    total_count = total_count_result.scalar_one_or_none()
+    if total_count is None:
+        total_count = 0
+
+    print(f"total_count type: {type(total_count)} value: {total_count}")
+
+    total_count = int(total_count)
+
+    query = query.offset(skip).limit(limit)
+
+    feeds_result = await db.execute(query)
+    feeds = feeds_result.all()
+    if feeds is None:
+        feeds = []
 
     feed_responses = []
 
     for feed, nickname in feeds:
-        feed_dict = {
-            "id": feed.id,
-            "title": feed.title,
-            "content": feed.content,
-            "author_email": feed.author_email,
-            "author_nickname": nickname,
-            "image_urls": feed.image_urls,
-        }
-        feed_responses.append(feed_dict)
+        feed_dict = FeedResponse(
+            id=feed.id,
+            title=feed.title,
+            content=feed.content,
+            author_email=feed.author_email,
+            author_nickname=nickname,
+            image_urls=feed.image_urls,
+            create_dt=feed.create_dt,
+            update_dt=feed.update_dt,
+        )
+        feed_responses.append(feed_dict.model_dump())
 
-    return feed_responses
+    return total_count, feed_responses
+
+
+async def get_feeds(
+    db: AsyncSession,
+    skip: int = 0,
+    limit: int = 10,
+    sort_by: str = "create_dt_desc",
+):
+    query = select(Feed, User.nickname).join(User, User.email == Feed.author_email)
+
+    if sort_by == "create_dt_desc":
+        query = query.order_by(desc(Feed.create_dt))
+    elif sort_by == "create_dt_asc":
+        query = query.order_by(asc(Feed.create_dt))
+    elif sort_by == "update_dt_desc":
+        query = query.order_by(desc(Feed.update_dt))
+    elif sort_by == "update_dt_asc":
+        query = query.order_by(asc(Feed.update_dt))
+
+    total_count_result = await db.execute(select(func.count()).select_from(Feed))
+    total_count = total_count_result.scalar_one_or_none()
+    if total_count is None:
+        total_count = 0
+
+    total_count = int(total_count)
+
+    query = query.offset(skip).limit(limit)
+
+    feeds_result = await db.execute(query)
+    feeds = feeds_result.all()
+    if feeds is None:
+        feeds = []
+
+    feed_responses = []
+
+    for feed, nickname in feeds:
+        feed_dict = FeedResponse(
+            id=feed.id,
+            title=feed.title,
+            content=feed.content,
+            author_email=feed.author_email,
+            author_nickname=nickname,
+            image_urls=feed.image_urls,
+            create_dt=feed.create_dt,
+            update_dt=feed.update_dt,
+        )
+        feed_responses.append(feed_dict.model_dump())
+
+    return total_count, feed_responses
 
 
 async def update_feed(
@@ -100,6 +208,10 @@ async def update_feed(
 ):
     db_feed = await db.execute(select(Feed).where(Feed.id == feed_id))
     db_feed = db_feed.scalar_one_or_none()
+
+    korea = pytz.timezone("Asia/Seoul")
+    current_time_in_korea = datetime.now(korea)
+    db_feed.update_dt = current_time_in_korea
 
     if db_feed is None:
         raise HTTPException(status_code=404, detail="Feed Not Found")
@@ -150,6 +262,8 @@ async def update_feed(
         "author_email": db_feed.author_email,
         "author_nickname": author_nickname,
         "image_urls": db_feed.image_urls,
+        "create_dt": db_feed.create_dt,
+        "update_dt": db_feed.update_dt,
     }
 
     logging.debug(f"Updated feed: {result}")
