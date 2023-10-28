@@ -1,8 +1,8 @@
-from sqlalchemy import select
+from sqlalchemy import select, desc, asc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 from models.user import User
-from models.feed import Feed
+from models.feed import Feed, FeedResponse
 from models.comment import Comment
 from models.follow import Follow
 import logging
@@ -19,21 +19,63 @@ async def get_user_profile(db: AsyncSession, user_email: str):
     if not user_profile:
         raise HTTPException(status_code=404, detail="User profile not found.")
 
-    return user_profile
+    user_data = user_profile.__dict__
+    user_data.pop("password", None)
+
+    return user_data
 
 
-async def get_user_feeds(db: AsyncSession, user_email: str):
-    # 사용자가 작성한 게시물 목록 가져오기
-    query = (
-        select(Feed)
-        .join(User, User.id == Feed.author_id)
-        .where(User.email == user_email)
-        .order_by(Feed.id.desc())
-    )
-    result = await db.execute(query)
-    user_feeds = result.scalars().all()
+async def get_user_feeds(
+    db: AsyncSession,
+    email: str,
+    skip: int = 0,
+    limit: int = 10,
+    sort_by: str = "create_dt_desc",
+):
+    query = select(Feed, User.nickname).join(User, User.email == Feed.author_email)
 
-    return user_feeds
+    condition = User.email == email
+    query = query.where(condition)
+
+    if sort_by == "create_dt_desc":
+        query = query.order_by(desc(Feed.create_dt))
+    elif sort_by == "create_dt_asc":
+        query = query.order_by(asc(Feed.create_dt))
+    elif sort_by == "update_dt_desc":  # update_dt 내림차순 정렬 조건 추가
+        query = query.order_by(desc(Feed.update_dt))
+    elif sort_by == "update_dt_asc":  # update_dt 오름차순 정렬 조건 추가
+        query = query.order_by(asc(Feed.update_dt))
+
+    total_count_result = await db.execute(select(func.count()).select_from(Feed).where(condition))
+    total_count = total_count_result.scalar_one_or_none()
+    if total_count is None:
+        total_count = 0
+
+    total_count = int(total_count)
+
+    query = query.offset(skip).limit(limit)
+
+    feeds_result = await db.execute(query)
+    feeds = feeds_result.all()
+    if feeds is None:
+        feeds = []
+
+    feed_responses = []
+
+    for feed, nickname in feeds:
+        feed_dict = FeedResponse(
+            id=feed.id,
+            title=feed.title,
+            content=feed.content,
+            author_email=feed.author_email,
+            author_nickname=nickname,
+            image_urls=feed.image_urls,
+            create_dt=feed.create_dt,
+            update_dt=feed.update_dt,
+        )
+        feed_responses.append(feed_dict.model_dump())
+
+    return total_count, feed_responses
 
 
 async def get_user_comments(db: AsyncSession, user_email: str):
@@ -42,7 +84,7 @@ async def get_user_comments(db: AsyncSession, user_email: str):
         select(Comment)
         .join(User, User.email == Comment.author_email)
         .where(User.email == user_email)
-        .order_by(Comment.id.desc())  # 최신 코멘트부터 표시
+        .order_by(Comment.create_dt.desc())  # 최신 코멘트부터 표시
     )
     result = await db.execute(query)
     user_comments = result.scalars().all()
@@ -60,7 +102,13 @@ async def get_user_followers(db: AsyncSession, user_id: int):
     result = await db.execute(query)
     followers = result.scalars().all()
 
-    return [user.email for user in followers]
+    def extract_profile(user):
+        return {
+            "email": user.email,
+            "nickname": user.nickname,
+        }
+
+    return [extract_profile(user) for user in followers]
 
 
 async def get_user_followings(db: AsyncSession, user_id: int):
@@ -73,4 +121,10 @@ async def get_user_followings(db: AsyncSession, user_id: int):
     result = await db.execute(query)
     followings = result.scalars().all()
 
-    return [user.email for user in followings]
+    def extract_profile(user):
+        return {
+            "email": user.email,
+            "nickname": user.nickname,  # 가정: User 모델에 'nickname' 필드가 있다.
+        }
+
+    return [extract_profile(user) for user in followings]
